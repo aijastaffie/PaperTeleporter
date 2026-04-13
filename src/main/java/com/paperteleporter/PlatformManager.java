@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.UUID;
 
 public final class PlatformManager {
+    public static final int MAX_PLATFORMS = 216;
+
     private final JavaPlugin plugin;
     private final PlatformStore store;
 
@@ -88,6 +90,10 @@ public final class PlatformManager {
 
     public String createPlatformWithPreset(Player player, String idInput, Location anchorLocation, int presetNumber) {
         String id = idInput.toLowerCase();
+        if (byId.size() >= MAX_PLATFORMS) {
+            return ChatColor.RED + "Cannot create more platforms. Maximum is " + MAX_PLATFORMS + ".";
+        }
+
         if (containsId(id)) {
             return ChatColor.RED + "Platform id already exists: " + id;
         }
