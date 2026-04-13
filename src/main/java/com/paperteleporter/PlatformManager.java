@@ -32,11 +32,13 @@ import java.util.UUID;
 
 public final class PlatformManager {
     public static final int MAX_PLATFORMS = 216;
+    private static final int DEFAULT_MIN_SPAWN_DISTANCE = 20;
 
     private final JavaPlugin plugin;
     private final PlatformStore store;
 
     private PlatformMaterials materials;
+    private int minSpawnDistance = DEFAULT_MIN_SPAWN_DISTANCE;
     private final Map<String, PlatformData> byId = new LinkedHashMap<>();
     private final Map<UUID, PlatformData> byNpc = new HashMap<>();
 
@@ -73,6 +75,18 @@ public final class PlatformManager {
 
     public Collection<PlatformData> allPlatforms() {
         return byId.values();
+    }
+
+    public int getMinSpawnDistance() {
+        return minSpawnDistance;
+    }
+
+    public String setMinSpawnDistance(int distance) {
+        if (distance < 20) {
+            return ChatColor.RED + "Minimum spawn distance must be at least 20 blocks.";
+        }
+        this.minSpawnDistance = distance;
+        return ChatColor.GREEN + "Minimum spawn distance set to " + distance + " blocks.";
     }
 
     public boolean isProtectedBlock(Location location) {
@@ -122,6 +136,12 @@ public final class PlatformManager {
         for (PlatformData existing : byId.values()) {
             if (existing.getWorldName().equals(worldName) && existing.getSpawnPoint().equals(center)) {
                 return ChatColor.RED + "Cannot create platform: location overlaps with existing platform '" + existing.getId() + "'.";
+            }
+            if (existing.getWorldName().equals(worldName)) {
+                double distance = center.distanceTo(existing.getSpawnPoint());
+                if (distance < minSpawnDistance) {
+                    return ChatColor.RED + "Platform too close to '" + existing.getId() + "' (" + String.format("%.1f", distance) + "m, min: " + minSpawnDistance + "m).";
+                }
             }
         }
 

@@ -32,15 +32,15 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (args.length < 2) {
-            player.sendMessage(ChatColor.RED + "Usage: /pt <add|remove|rotate|preset> <platformName> [preset]");
+        if (args.length < 1) {
+            player.sendMessage(ChatColor.RED + "Usage: /pt <add|remove|rotate|preset|spawnpoint> <platformName> [preset]");
             return true;
         }
 
         String action = args[0].toLowerCase();
-        String id = args[1];
+        String id = args.length >= 2 ? args[1] : "";
 
-        if (!action.equals("add") && !id.matches("[a-zA-Z0-9_-]{3,40}")) {
+        if (args.length >= 2 && !action.equals("add") && !id.matches("[a-zA-Z0-9_-]{3,40}")) {
             player.sendMessage(ChatColor.RED + "Platform name must match [a-zA-Z0-9_-] and be 3-40 chars.");
             return true;
         }
@@ -60,11 +60,19 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
         }
 
         if ("remove".equals(action)) {
+            if (args.length < 2) {
+                player.sendMessage(ChatColor.RED + "Usage: /pt remove <platformName>");
+                return true;
+            }
             player.sendMessage(platformManager.removePlatform(id));
             return true;
         }
 
         if ("rotate".equals(action)) {
+            if (args.length < 2) {
+                player.sendMessage(ChatColor.RED + "Usage: /pt rotate <platformName>");
+                return true;
+            }
             player.sendMessage(platformManager.rotatePlatform(id));
             return true;
         }
@@ -87,7 +95,25 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        player.sendMessage(ChatColor.RED + "Unknown action. Use add, remove, rotate or preset.");
+        if ("spawnpoint".equals(action)) {
+            if (args.length == 1) {
+                player.sendMessage(ChatColor.GREEN + "Current minimum spawn distance: " + platformManager.getMinSpawnDistance() + " blocks.");
+                return true;
+            }
+            if (args.length == 2) {
+                try {
+                    int distance = Integer.parseInt(id);
+                    player.sendMessage(platformManager.setMinSpawnDistance(distance));
+                } catch (NumberFormatException e) {
+                    player.sendMessage(ChatColor.RED + "Distance must be a number (minimum 20).");
+                }
+                return true;
+            }
+            player.sendMessage(ChatColor.RED + "Usage: /pt spawnpoint [distance]");
+            return true;
+        }
+
+        player.sendMessage(ChatColor.RED + "Unknown action. Use add, remove, rotate, preset or spawnpoint.");
         return true;
     }
 
@@ -106,6 +132,9 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
             }
             if ("preset".startsWith(args[0].toLowerCase())) {
                 options.add("preset");
+            }
+            if ("spawnpoint".startsWith(args[0].toLowerCase())) {
+                options.add("spawnpoint");
             }
             return options;
         }

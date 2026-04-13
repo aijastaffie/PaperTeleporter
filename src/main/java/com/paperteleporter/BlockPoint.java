@@ -39,6 +39,13 @@ public final class BlockPoint {
         return z;
     }
 
+    public double distanceTo(BlockPoint other) {
+        int dx = other.x - this.x;
+        int dy = other.y - this.y;
+        int dz = other.z - this.z;
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
