@@ -277,7 +277,7 @@ public final class PlatformManager {
                 int x = centerX + direction.rightX * (r - 3) + direction.forwardX * (f - 3);
                 int z = centerZ + direction.rightZ * (r - 3) + direction.forwardZ * (f - 3);
 
-                for (int y = centerY; y <= centerY + 4; y++) {
+                for (int y = centerY; y <= centerY + 5; y++) {
                     world.getBlockAt(x, y, z).setType(Material.AIR, false);
                     protectedBlocks.add(new BlockPoint(x, y, z));
                 }
