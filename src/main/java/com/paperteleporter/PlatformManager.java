@@ -12,6 +12,7 @@ import org.bukkit.block.data.Directional;
 import org.bukkit.block.data.type.Stairs;
 import org.bukkit.block.data.type.Wall;
 import org.bukkit.block.data.type.Wall.Height;
+import org.bukkit.block.data.type.Fence;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
@@ -106,9 +107,9 @@ public final class PlatformManager {
         int baseY = anchorLocation.getBlockY();
         int baseZ = anchorLocation.getBlockZ();
 
-        int centerX = baseX + (direction.rightX * 6) + (direction.forwardX * 3);
+        int centerX = baseX + (direction.rightX * 3) + (direction.forwardX * 3);
         int centerY = baseY;
-        int centerZ = baseZ + (direction.rightZ * 6) + (direction.forwardZ * 3);
+        int centerZ = baseZ + (direction.rightZ * 3) + (direction.forwardZ * 3);
 
         BlockPoint center = new BlockPoint(centerX, centerY, centerZ);
         Preset preset = Preset.fromNumber(presetNumber);
@@ -284,7 +285,7 @@ public final class PlatformManager {
                     floorBlock.setType(materials.stairs(), false);
                     BlockData stairData = floorBlock.getBlockData();
                     if (stairData instanceof Stairs stairs) {
-                        stairs.setFacing(direction.openingFace());
+                        stairs.setFacing(direction.openingFaceOpposite());
                         floorBlock.setBlockData(stairs, false);
                     }
                 } else {
@@ -349,6 +350,12 @@ public final class PlatformManager {
                 wall.setHeight(BlockFace.EAST, Height.LOW);
                 wall.setHeight(BlockFace.WEST, Height.LOW);
                 b.setBlockData(wall, false);
+            } else if (data instanceof org.bukkit.block.data.type.Fence fence) {
+                fence.setFace(BlockFace.NORTH, true);
+                fence.setFace(BlockFace.SOUTH, true);
+                fence.setFace(BlockFace.EAST, true);
+                fence.setFace(BlockFace.WEST, true);
+                b.setBlockData(fence, false);
             }
         }
     }
@@ -379,6 +386,19 @@ public final class PlatformManager {
                 return BlockFace.SOUTH;
             }
             return BlockFace.NORTH;
+        }
+
+        BlockFace openingFaceOpposite() {
+            if (forwardX == 1) {
+                return BlockFace.WEST;
+            }
+            if (forwardX == -1) {
+                return BlockFace.EAST;
+            }
+            if (forwardZ == 1) {
+                return BlockFace.NORTH;
+            }
+            return BlockFace.SOUTH;
         }
 
         DirectionPair rotate180() {
