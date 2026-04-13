@@ -78,6 +78,19 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
         }
 
         if ("preset".equals(action)) {
+            if (args.length == 2 && "remove".equalsIgnoreCase(id)) {
+                player.sendMessage(ChatColor.RED + "Usage: /pt preset remove <number>");
+                return true;
+            }
+            if (args.length == 3 && "remove".equalsIgnoreCase(id)) {
+                try {
+                    int presetNumber = Integer.parseInt(args[2]);
+                    player.sendMessage(platformManager.removeCustomPreset(presetNumber));
+                } catch (NumberFormatException e) {
+                    player.sendMessage(ChatColor.RED + "Preset number must be a number.");
+                }
+                return true;
+            }
             if (args.length != 3) {
                 player.sendMessage(ChatColor.RED + "Usage: /pt preset <platformName> <1-6>");
                 return true;
@@ -91,6 +104,30 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
                 player.sendMessage(platformManager.changePreset(id, presetNumber));
             } catch (NumberFormatException e) {
                 player.sendMessage(ChatColor.RED + "Preset must be a number 1-6.");
+            }
+            return true;
+        }
+
+        if ("save-preset".equals(action)) {
+            if (args.length != 3) {
+                player.sendMessage(ChatColor.RED + "Usage: /pt save-preset <name> <number>");
+                return true;
+            }
+            String presetName = id;
+            try {
+                int presetNumber = Integer.parseInt(args[2]);
+                if (presetNumber < 1 || presetNumber > 99) {
+                    player.sendMessage(ChatColor.RED + "Custom preset number must be 1-99.");
+                    return true;
+                }
+                Block targetBlock = player.getTargetBlockExact(20);
+                if (targetBlock == null) {
+                    player.sendMessage(ChatColor.RED + "Look at a block within 20 blocks. This will be the center of the 7x7x7.");
+                    return true;
+                }
+                player.sendMessage(platformManager.saveCustomPreset(player, presetName, presetNumber, targetBlock.getLocation()));
+            } catch (NumberFormatException e) {
+                player.sendMessage(ChatColor.RED + "Preset number must be a number.");
             }
             return true;
         }
@@ -133,6 +170,9 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
             if ("preset".startsWith(args[0].toLowerCase())) {
                 options.add("preset");
             }
+            if ("save-preset".startsWith(args[0].toLowerCase())) {
+                options.add("save-preset");
+            }
             if ("spawnpoint".startsWith(args[0].toLowerCase())) {
                 options.add("spawnpoint");
             }
@@ -141,6 +181,20 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 2) {
             String action = args[0].toLowerCase();
+            if ("preset".equalsIgnoreCase(action)) {
+                List<String> options = new ArrayList<>();
+                if ("remove".startsWith(args[1].toLowerCase())) {
+                    options.add("remove");
+                }
+                Collection<PlatformData> platforms = platformManager.allPlatforms();
+                String prefix = args[1].toLowerCase();
+                for (PlatformData platform : platforms) {
+                    if (platform.getId().startsWith(prefix)) {
+                        options.add(platform.getId());
+                    }
+                }
+                return options;
+            }
             if ("remove".equalsIgnoreCase(action) || "rotate".equalsIgnoreCase(action) || "preset".equalsIgnoreCase(action)) {
                 Collection<PlatformData> platforms = platformManager.allPlatforms();
                 List<String> ids = new ArrayList<>();
@@ -152,17 +206,33 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
                 }
                 return ids;
             }
+            if ("save-preset".equalsIgnoreCase(action)) {
+                return new ArrayList<>(); // Name suggestions could be empty or populated from history
+            }
         }
 
-        if (args.length == 3 && "preset".equalsIgnoreCase(args[0])) {
-            List<String> presetNumbers = new ArrayList<>();
-            String prefix = args[2];
-            for (int i = 1; i <= 6; i++) {
-                if (String.valueOf(i).startsWith(prefix)) {
-                    presetNumbers.add(String.valueOf(i));
+        if (args.length == 3) {
+            String action = args[0].toLowerCase();
+            if ("preset".equalsIgnoreCase(action)) {
+                List<String> presetNumbers = new ArrayList<>();
+                String prefix = args[2];
+                for (int i = 1; i <= 6; i++) {
+                    if (String.valueOf(i).startsWith(prefix)) {
+                        presetNumbers.add(String.valueOf(i));
+                    }
                 }
+                return presetNumbers;
             }
-            return presetNumbers;
+            if ("save-preset".equalsIgnoreCase(action)) {
+                List<String> presetNumbers = new ArrayList<>();
+                String prefix = args[2];
+                for (int i = 1; i <= 99; i++) {
+                    if (String.valueOf(i).startsWith(prefix)) {
+                        presetNumbers.add(String.valueOf(i));
+                    }
+                }
+                return presetNumbers;
+            }
         }
 
         return List.of();

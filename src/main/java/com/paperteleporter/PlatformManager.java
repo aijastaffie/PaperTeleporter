@@ -36,16 +36,24 @@ public final class PlatformManager {
 
     private final JavaPlugin plugin;
     private final PlatformStore store;
+    private final CustomPresetStore customPresetStore;
 
     private PlatformMaterials materials;
     private int minSpawnDistance = DEFAULT_MIN_SPAWN_DISTANCE;
     private final Map<String, PlatformData> byId = new LinkedHashMap<>();
     private final Map<UUID, PlatformData> byNpc = new HashMap<>();
+    private final Map<Integer, CustomPresetData> customPresets = new HashMap<>();
 
     public PlatformManager(JavaPlugin plugin, PlatformStore store, PlatformMaterials materials) {
         this.plugin = plugin;
         this.store = store;
+        this.customPresetStore = new CustomPresetStore(plugin);
         this.materials = materials;
+        try {
+            this.customPresets.putAll(customPresetStore.load());
+        } catch (IOException e) {
+            plugin.getLogger().warning("Failed to load custom presets: " + e.getMessage());
+        }
     }
 
     public void load() throws IOException {
@@ -89,6 +97,76 @@ public final class PlatformManager {
         return ChatColor.GREEN + "Minimum spawn distance set to " + distance + " blocks.";
     }
 
+    public CustomPresetData getCustomPreset(int number) {
+        return customPresets.get(number);
+    }
+
+    public String saveCustomPreset(Player player, String presetName, int presetNumber, Location centerLocation) {
+        if (customPresets.containsKey(presetNumber)) {
+            return ChatColor.YELLOW + "Custom preset " + presetNumber + " already exists. Use /pt preset remove " + presetNumber + " first.";
+        }
+
+        World world = centerLocation.getWorld();
+        if (world == null) {
+            return ChatColor.RED + "Could not resolve world.";
+        }
+
+        BlockPoint center = BlockPoint.fromLocation(centerLocation);
+        List<CustomPresetData.BlockEntry> blocks = new ArrayList<>();
+
+        for (int r = 0; r < 7; r++) {
+            for (int f = 0; f < 7; f++) {
+                for (int y = 0; y < 7; y++) {
+                    int x = center.getX() - 3 + r;
+                    int blockY = center.getY() + y;
+                    int z = center.getZ() - 3 + f;
+                    Block block = world.getBlockAt(x, blockY, z);
+                    if (block.getType() != Material.AIR) {
+                        blocks.add(new CustomPresetData.BlockEntry(r, y, f, block.getType().name()));
+                    }
+                    world.getBlockAt(x, blockY, z).setType(Material.AIR, false);
+                }
+            }
+        }
+
+        CustomPresetData data = new CustomPresetData(presetNumber, presetName, blocks);
+        customPresets.put(presetNumber, data);
+
+        try {
+            customPresetStore.save(customPresets);
+        } catch (IOException e) {
+            plugin.getLogger().warning("Failed to save custom preset: " + e.getMessage());
+            return ChatColor.RED + "Failed to save custom preset.";
+        }
+
+        addDefaultStructure(world, center);
+        return ChatColor.GREEN + "Custom preset " + presetNumber + " (\"" + presetName + "\") saved and area cleared.";
+    }
+
+    public String removeCustomPreset(int presetNumber) {
+        if (!customPresets.containsKey(presetNumber)) {
+            return ChatColor.RED + "Custom preset " + presetNumber + " does not exist.";
+        }
+        customPresets.remove(presetNumber);
+        try {
+            customPresetStore.save(customPresets);
+        } catch (IOException e) {
+            plugin.getLogger().warning("Failed to save custom presets: " + e.getMessage());
+            return ChatColor.RED + "Failed to remove custom preset.";
+        }
+        return ChatColor.GREEN + "Custom preset " + presetNumber + " removed.";
+    }
+
+    private void addDefaultStructure(World world, BlockPoint center) {
+        world.getBlockAt(center.getX(), center.getY(), center.getZ()).setType(materials.spawn(), false);
+        world.getBlockAt(center.getX(), center.getY(), center.getZ() - 1).setType(materials.npc(), false);
+        int lightY = center.getY() + 6;
+        world.getBlockAt(center.getX() - 3, lightY, center.getZ() - 3).setType(materials.light(), false);
+        world.getBlockAt(center.getX() - 3, lightY, center.getZ() + 3).setType(materials.light(), false);
+        world.getBlockAt(center.getX() + 3, lightY, center.getZ() - 3).setType(materials.light(), false);
+        world.getBlockAt(center.getX() + 3, lightY, center.getZ() + 3).setType(materials.light(), false);
+    }
+
     public boolean isProtectedBlock(Location location) {
         for (PlatformData data : byId.values()) {
             if (data.isProtectedBlock(location)) {
@@ -112,8 +190,19 @@ public final class PlatformManager {
             return ChatColor.RED + "Platform id already exists: " + id;
         }
 
-        if (!Preset.isValid(presetNumber)) {
-            return ChatColor.RED + "Invalid preset number. Valid: 1-6";
+        // Check if it's a custom preset or built-in
+        boolean isCustom = presetNumber > 6;
+        if (isCustom) {
+            if (presetNumber < 1 || presetNumber > 99) {
+                return ChatColor.RED + "Invalid custom preset number. Valid: 1-99";
+            }
+            if (customPresets == null || !customPresets.containsKey(presetNumber)) {
+                return ChatColor.RED + "Custom preset " + presetNumber + " not found.";
+            }
+        } else {
+            if (!Preset.isValid(presetNumber)) {
+                return ChatColor.RED + "Invalid preset number. Valid: 1-6 (built-in) or 7-99 (custom)";
+            }
         }
 
         World world = anchorLocation.getWorld();
@@ -145,8 +234,14 @@ public final class PlatformManager {
             }
         }
 
-        Preset preset = Preset.fromNumber(presetNumber);
-        BuildResult result = buildPlatform(world, center, direction, preset);
+        BuildResult result;
+        if (isCustom) {
+            CustomPresetData customData = customPresets.get(presetNumber);
+            result = buildCustomPlatform(world, center, direction, customData);
+        } else {
+            Preset preset = Preset.fromNumber(presetNumber);
+            result = buildPlatform(world, center, direction, preset);
+        }
 
         BlockPoint anchor = BlockPoint.fromLocation(anchorLocation);
         PlatformData data = new PlatformData(id, worldName, anchor, center, result.npcUuid(), result.protectedBlocks(), direction.toIndex(), presetNumber);
@@ -407,6 +502,70 @@ public final class PlatformManager {
         fixWallConnections(world, railingBlocks);
 
         Location npcLocation = relativeLocation(world, centerX, centerY + 1, centerZ, direction, 3, 2).add(0.5, 0.0, 0.5);
+        Location openingCenter = relativeLocation(world, centerX, centerY + 1, centerZ, direction, 3, 6).add(0.5, 0.0, 0.5);
+        npcLocation.setDirection(openingCenter.toVector().subtract(npcLocation.toVector()));
+        Villager villager = (Villager) world.spawnEntity(npcLocation, EntityType.VILLAGER);
+        villager.customName(Component.text("Teleporter NPC", NamedTextColor.GOLD));
+        villager.setCustomNameVisible(true);
+        villager.setAI(false);
+        villager.setInvulnerable(true);
+        villager.setCollidable(false);
+        villager.setPersistent(true);
+
+        return new BuildResult(villager.getUniqueId(), protectedBlocks);
+    }
+
+    private BuildResult buildCustomPlatform(World world, BlockPoint center, DirectionPair direction, CustomPresetData customPreset) {
+        int centerX = center.getX();
+        int centerY = center.getY();
+        int centerZ = center.getZ();
+
+        List<BlockPoint> protectedBlocks = new ArrayList<>();
+
+        // Clear the 7x7x7 area first
+        for (int r = 0; r < 7; r++) {
+            for (int f = 0; f < 7; f++) {
+                int x = centerX + direction.rightX * (r - 3) + direction.forwardX * (f - 3);
+                int z = centerZ + direction.rightZ * (r - 3) + direction.forwardZ * (f - 3);
+
+                for (int y = centerY; y <= centerY + 6; y++) {
+                    world.getBlockAt(x, y, z).setType(Material.AIR, false);
+                    protectedBlocks.add(new BlockPoint(x, y, z));
+                }
+            }
+        }
+
+        // Place custom blocks from the preset data
+        if (customPreset.getBlocks() != null) {
+            for (CustomPresetData.BlockEntry entry : customPreset.getBlocks()) {
+                int rx = entry.getX();
+                int ry = entry.getY();
+                int rz = entry.getZ();
+                Material material = Material.matchMaterial(entry.getMaterial());
+                
+                if (material == null) {
+                    plugin.getLogger().warning("Unknown material in custom preset: " + entry.getMaterial());
+                    continue;
+                }
+
+                // Transform relative coordinates (1-7) to world coordinates
+                // rx=1 → -3, rx=4 → 0, rx=7 → +3 (using right vector)
+                // rz=1 → -3, rz=4 → 0, rz=7 → +3 (using forward vector)
+                int worldX = centerX + direction.rightX * (rx - 4) + direction.forwardX * (rz - 4);
+                int worldY = centerY + ry - 1;
+                int worldZ = centerZ + direction.rightZ * (rx - 4) + direction.forwardZ * (rz - 4);
+
+                Block block = world.getBlockAt(worldX, worldY, worldZ);
+                block.setType(material, false);
+                protectedBlocks.add(new BlockPoint(worldX, worldY, worldZ));
+            }
+        }
+
+        // Add default spawn point and NPC
+        addDefaultStructure(world, center);
+
+        // Create NPC at standard position
+        Location npcLocation = new Location(world, centerX + direction.rightX * 3 + 0.5, centerY + 2.0, centerZ + direction.forwardZ * 3 + 0.5);
         Location openingCenter = relativeLocation(world, centerX, centerY + 1, centerZ, direction, 3, 6).add(0.5, 0.0, 0.5);
         npcLocation.setDirection(openingCenter.toVector().subtract(npcLocation.toVector()));
         Villager villager = (Villager) world.spawnEntity(npcLocation, EntityType.VILLAGER);
