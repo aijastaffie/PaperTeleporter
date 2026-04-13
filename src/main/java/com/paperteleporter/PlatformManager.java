@@ -110,7 +110,7 @@ public final class PlatformManager {
         DirectionPair direction = DirectionPair.fromYaw(player.getLocation().getYaw()).rotate180();
 
         int baseX = anchorLocation.getBlockX();
-        int baseY = anchorLocation.getBlockY() + 1;
+        int baseY = anchorLocation.getBlockY();
         int baseZ = anchorLocation.getBlockZ();
 
         int centerX = baseX - (direction.forwardX * 3);
@@ -118,11 +118,18 @@ public final class PlatformManager {
         int centerZ = baseZ - (direction.forwardZ * 3);
 
         BlockPoint center = new BlockPoint(centerX, centerY, centerZ);
+        String worldName = world.getName();
+        for (PlatformData existing : byId.values()) {
+            if (existing.getWorldName().equals(worldName) && existing.getSpawnPoint().equals(center)) {
+                return ChatColor.RED + "Cannot create platform: location overlaps with existing platform '" + existing.getId() + "'.";
+            }
+        }
+
         Preset preset = Preset.fromNumber(presetNumber);
         BuildResult result = buildPlatform(world, center, direction, preset);
 
         BlockPoint anchor = BlockPoint.fromLocation(anchorLocation);
-        PlatformData data = new PlatformData(id, world.getName(), anchor, center, result.npcUuid(), result.protectedBlocks(), direction.toIndex(), presetNumber);
+        PlatformData data = new PlatformData(id, worldName, anchor, center, result.npcUuid(), result.protectedBlocks(), direction.toIndex(), presetNumber);
 
         byId.put(id, data);
         byNpc.put(result.npcUuid(), data);
