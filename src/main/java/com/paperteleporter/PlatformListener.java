@@ -28,23 +28,17 @@ public final class PlatformListener implements Listener {
 
     @EventHandler
     public void onBreak(BlockBreakEvent event) {
-        if (event.getPlayer().isOp()) {
-            return;
-        }
         if (platformManager.isProtectedBlock(event.getBlock().getLocation())) {
             event.setCancelled(true);
-            event.getPlayer().sendMessage(ChatColor.RED + "This teleport platform is protected.");
+            event.getPlayer().sendMessage(ChatColor.RED + "This teleport platform is protected. Use /pt remove <id> to remove it.");
         }
     }
 
     @EventHandler
     public void onPlace(BlockPlaceEvent event) {
-        if (event.getPlayer().isOp()) {
-            return;
-        }
         if (platformManager.isProtectedBlock(event.getBlock().getLocation())) {
             event.setCancelled(true);
-            event.getPlayer().sendMessage(ChatColor.RED + "This teleport platform is protected.");
+            event.getPlayer().sendMessage(ChatColor.RED + "This teleport platform is protected. Use /pt remove <id> to remove it.");
         }
     }
 
