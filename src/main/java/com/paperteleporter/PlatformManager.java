@@ -281,7 +281,7 @@ public final class PlatformManager {
                     floorBlock.setType(materials.spawn(), false);
                 } else if (r == 3 && f == 2) {
                     floorBlock.setType(materials.npc(), false);
-                } else if (f == 6 && r >= 2 && r <= 4 && (preset == Preset.FENCED)) {
+                } else if (f == 6 && r >= 2 && r <= 4 && preset != Preset.OPEN) {
                     floorBlock.setType(materials.stairs(), false);
                     BlockData stairData = floorBlock.getBlockData();
                     if (stairData instanceof Stairs stairs) {
@@ -308,12 +308,57 @@ public final class PlatformManager {
                     } else if (preset == Preset.TOWERING) {
                         railBlock.setType(materials.fence(), false);
                         railingBlocks.add(BlockPoint.fromLocation(railBlock.getLocation()));
-                        if (r == 0 && f == 0 || r == 0 && f == 6 || r == 6 && f == 0 || r == 6 && f == 6) {
-                            world.getBlockAt(x, centerY + 2, z).setType(materials.fence(), false);
+                        boolean isCorner = (r == 0 || r == 6) && (f == 0 || f == 6);
+                        if (isCorner) {
+                            for (int hy = centerY + 2; hy <= centerY + 4; hy++) {
+                                world.getBlockAt(x, hy, z).setType(materials.fence(), false);
+                            }
                         }
                     } else if (preset == Preset.FLAT_ROOF) {
-                        railBlock.setType(Material.GRAY_CONCRETE, false);
+                        railBlock.setType(materials.fence(), false);
                         railingBlocks.add(BlockPoint.fromLocation(railBlock.getLocation()));
+                        boolean isCorner = (r == 0 || r == 6) && (f == 0 || f == 6);
+                        if (isCorner) {
+                            for (int hy = centerY + 2; hy <= centerY + 4; hy++) {
+                                world.getBlockAt(x, hy, z).setType(materials.fence(), false);
+                            }
+                        }
+                    } else if (preset == Preset.GABLE_ROOF) {
+                        railBlock.setType(materials.fence(), false);
+                        railingBlocks.add(BlockPoint.fromLocation(railBlock.getLocation()));
+                    }
+                } else if (!perimeter && !opening && preset == Preset.FLAT_ROOF) {
+                    world.getBlockAt(x, centerY + 2, z).setType(Material.OAK_SLAB, false);
+                }
+            }
+        }
+
+        if (preset == Preset.FLAT_ROOF) {
+            for (int r = 0; r < 7; r++) {
+                for (int f = 0; f < 7; f++) {
+                    boolean opening = f == 6 && r >= 2 && r <= 4;
+                    if (!opening) {
+                        Location roofLocation = relativeLocation(world, centerX, centerY + 2, centerZ, direction, r, f);
+                        world.getBlockAt(roofLocation).setType(Material.OAK_SLAB, false);
+                    }
+                }
+            }
+        } else if (preset == Preset.GABLE_ROOF) {
+            for (int r = 0; r < 7; r++) {
+                for (int f = 0; f < 7; f++) {
+                    int distFromCenter = Math.abs(r - 3);
+                    int roofY = centerY + 2 + (3 - distFromCenter);
+                    Location roofLocation = relativeLocation(world, centerX, roofY, centerZ, direction, r, f);
+                    Block roofBlock = world.getBlockAt(roofLocation);
+                    roofBlock.setType(Material.OAK_STAIRS, false);
+                    BlockData roofData = roofBlock.getBlockData();
+                    if (roofData instanceof Directional directional) {
+                        if (r < 3) {
+                            directional.setFacing(direction.rightFace());
+                        } else if (r > 3) {
+                            directional.setFacing(direction.rightFaceOpposite());
+                        }
+                        roofBlock.setBlockData(directional, false);
                     }
                 }
             }
@@ -396,6 +441,32 @@ public final class PlatformManager {
                 return BlockFace.EAST;
             }
             if (forwardZ == 1) {
+                return BlockFace.NORTH;
+            }
+            return BlockFace.SOUTH;
+        }
+
+        BlockFace rightFace() {
+            if (rightX == 1) {
+                return BlockFace.EAST;
+            }
+            if (rightX == -1) {
+                return BlockFace.WEST;
+            }
+            if (rightZ == 1) {
+                return BlockFace.SOUTH;
+            }
+            return BlockFace.NORTH;
+        }
+
+        BlockFace rightFaceOpposite() {
+            if (rightX == 1) {
+                return BlockFace.WEST;
+            }
+            if (rightX == -1) {
+                return BlockFace.EAST;
+            }
+            if (rightZ == 1) {
                 return BlockFace.NORTH;
             }
             return BlockFace.SOUTH;
