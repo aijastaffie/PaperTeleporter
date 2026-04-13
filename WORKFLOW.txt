@@ -1,0 +1,22 @@
+PaperTeleporter stable workflow (release/1.0.x)
+
+Purpose
+- Production maintenance only: bug fixes, hotfixes, and small safe patches for released users.
+
+Do work here
+- Path: /home/prkldev/projects/minecraft-plugins/PaperTeleporter-stable
+- Branch: release/1.0.x
+
+Rules
+- No large refactors or new feature work.
+- Keep changes minimal and release-safe.
+- Build locally before push.
+
+Typical commands
+- git status -sb
+- JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew build
+- git add -A && git commit -m "fix: <message>"
+- git push origin release/1.0.x
+
+Release flow
+- Tag stable releases from this line (for example v1.0.1, v1.0.2).
