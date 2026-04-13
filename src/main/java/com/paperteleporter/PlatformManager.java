@@ -369,8 +369,9 @@ public final class PlatformManager {
         if (preset == Preset.FLAT_ROOF) {
             for (int r = 0; r < 7; r++) {
                 for (int f = 0; f < 7; f++) {
+                    boolean perimeter = r == 0 || r == 6 || f == 0 || f == 6;
                     boolean opening = f == 6 && r >= 2 && r <= 4;
-                    if (!opening) {
+                    if (!perimeter && !opening) {
                         Location roofLocation = relativeLocation(world, centerX, centerY + 2, centerZ, direction, r, f);
                         world.getBlockAt(roofLocation).setType(Material.OAK_SLAB, false);
                     }
