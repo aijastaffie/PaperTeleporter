@@ -1,0 +1,22 @@
+PaperTeleporterADV workflow (dev/v1.1.0)
+
+Purpose
+- New features, architecture changes, and experimental improvements for the ADV line.
+
+Do work here
+- Path: /home/prkldev/projects/minecraft-plugins/PaperTeleporter
+- Branch: dev/v1.1.0
+
+Rules
+- Keep stable release behavior untouched unless a change is intentionally backported.
+- Use clear commit messages for feature work.
+- Build locally before push.
+
+Typical commands
+- git status -sb
+- JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew build
+- git add -A && git commit -m "<message>"
+- git push origin dev/v1.1.0
+
+Backport flow
+- If a fix is needed for production, implement/cherry-pick to release/1.0.x in the stable worktree.
