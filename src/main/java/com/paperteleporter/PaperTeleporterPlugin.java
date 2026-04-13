@@ -7,12 +7,14 @@ import java.io.IOException;
 
 public final class PaperTeleporterPlugin extends JavaPlugin {
     private PlatformManager platformManager;
+    private RoleStore roleStore;
 
     @Override
     public void onEnable() {
         try {
             PlatformMaterials materials = PlatformMaterials.load(this);
             PlatformStore store = new PlatformStore(this);
+            this.roleStore = new RoleStore(this, getDataFolder());
 
             platformManager = new PlatformManager(this, store, materials);
             platformManager.load();
@@ -24,12 +26,13 @@ public final class PaperTeleporterPlugin extends JavaPlugin {
 
         PluginCommand ptCmd = getCommand("pt");
         if (ptCmd != null) {
-            PtCommand handler = new PtCommand(platformManager);
+            PtCommand handler = new PtCommand(platformManager, roleStore);
             ptCmd.setExecutor(handler);
             ptCmd.setTabCompleter(handler);
         }
 
         getServer().getPluginManager().registerEvents(new PlatformListener(platformManager), this);
+        getServer().getPluginManager().registerEvents(new ChestAccessListener(platformManager, roleStore), this);
         getLogger().info("PaperTeleporter enabled.");
     }
 

@@ -15,6 +15,7 @@ public final class PlatformData {
     private BlockPoint anchor;
     private BlockPoint spawnPoint;
     private UUID npcUuid;
+    private BlockPoint chestLocation;
     private List<BlockPoint> protectedBlocks;
     private int directionIndex;
     private int presetNumber;
@@ -22,12 +23,13 @@ public final class PlatformData {
     public PlatformData() {
     }
 
-    public PlatformData(String id, String worldName, BlockPoint anchor, BlockPoint spawnPoint, UUID npcUuid, List<BlockPoint> protectedBlocks, int directionIndex, int presetNumber) {
+    public PlatformData(String id, String worldName, BlockPoint anchor, BlockPoint spawnPoint, UUID npcUuid, BlockPoint chestLocation, List<BlockPoint> protectedBlocks, int directionIndex, int presetNumber) {
         this.id = id;
         this.worldName = worldName;
         this.anchor = anchor;
         this.spawnPoint = spawnPoint;
         this.npcUuid = npcUuid;
+        this.chestLocation = chestLocation;
         this.protectedBlocks = new ArrayList<>(protectedBlocks);
         this.directionIndex = directionIndex;
         this.presetNumber = presetNumber;
@@ -51,6 +53,14 @@ public final class PlatformData {
 
     public UUID getNpcUuid() {
         return npcUuid;
+    }
+
+    public BlockPoint getChestLocation() {
+        return chestLocation;
+    }
+
+    public void setChestLocation(BlockPoint chestLocation) {
+        this.chestLocation = chestLocation;
     }
 
     public List<BlockPoint> getProtectedBlocks() {

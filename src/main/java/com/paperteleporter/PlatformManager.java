@@ -101,6 +101,15 @@ public final class PlatformManager {
         return minSpawnDistance;
     }
 
+    public PlatformData getPlatformByChestLocation(BlockPoint chestLocation) {
+        for (PlatformData platform : byId.values()) {
+            if (platform.getChestLocation() != null && platform.getChestLocation().equals(chestLocation)) {
+                return platform;
+            }
+        }
+        return null;
+    }
+
     public String setMinSpawnDistance(int distance) {
         if (distance < 20) {
             return ChatColor.RED + "Minimum spawn distance must be at least 20 blocks.";
@@ -319,7 +328,7 @@ public final class PlatformManager {
         }
 
         BlockPoint anchor = BlockPoint.fromLocation(anchorLocation);
-        PlatformData data = new PlatformData(id, worldName, anchor, center, result.npcUuid(), result.protectedBlocks(), direction.toIndex(), presetNumber);
+        PlatformData data = new PlatformData(id, worldName, anchor, center, result.npcUuid(), result.chestLocation(), result.protectedBlocks(), direction.toIndex(), presetNumber);
 
         byId.put(id, data);
         byNpc.put(result.npcUuid(), data);
@@ -615,6 +624,13 @@ public final class PlatformManager {
 
         fixWallConnections(world, railingBlocks);
 
+        // Create chest next to NPC
+        Location chestLocation = relativeLocation(world, centerX, centerY + 1, centerZ, direction, 3, 1);
+        Block chestBlock = world.getBlockAt(chestLocation);
+        chestBlock.setType(Material.CHEST, false);
+        protectedBlocks.add(BlockPoint.fromLocation(chestLocation));
+        BlockPoint chestPoint = BlockPoint.fromLocation(chestLocation);
+
         Location npcLocation = relativeLocation(world, centerX, centerY + 1, centerZ, direction, 3, 2).add(0.5, 0.0, 0.5);
         Location openingCenter = relativeLocation(world, centerX, centerY + 1, centerZ, direction, 3, 6).add(0.5, 0.0, 0.5);
         npcLocation.setDirection(openingCenter.toVector().subtract(npcLocation.toVector()));
@@ -626,7 +642,7 @@ public final class PlatformManager {
         villager.setCollidable(false);
         villager.setPersistent(true);
 
-        return new BuildResult(villager.getUniqueId(), protectedBlocks);
+        return new BuildResult(villager.getUniqueId(), protectedBlocks, chestPoint);
     }
 
     private BuildResult buildCustomPlatform(World world, BlockPoint center, DirectionPair direction, CustomPresetData customPreset) {
@@ -702,6 +718,12 @@ public final class PlatformManager {
         fixWallConnections(world, railingBlocks);
 
         // Create NPC at same position logic as built-in platforms.
+        Location chestLocation = relativeLocation(world, centerX, centerY + 1, centerZ, direction, 3, 1);
+        Block chestBlock = world.getBlockAt(chestLocation);
+        chestBlock.setType(Material.CHEST, false);
+        protectedBlocks.add(BlockPoint.fromLocation(chestLocation));
+        BlockPoint chestPoint = BlockPoint.fromLocation(chestLocation);
+
         Location npcLocation = relativeLocation(world, centerX, centerY + 1, centerZ, direction, 3, 2).add(0.5, 0.0, 0.5);
         Location openingCenter = relativeLocation(world, centerX, centerY + 1, centerZ, direction, 3, 6).add(0.5, 0.0, 0.5);
         npcLocation.setDirection(openingCenter.toVector().subtract(npcLocation.toVector()));
@@ -713,7 +735,7 @@ public final class PlatformManager {
         villager.setCollidable(false);
         villager.setPersistent(true);
 
-        return new BuildResult(villager.getUniqueId(), protectedBlocks);
+        return new BuildResult(villager.getUniqueId(), protectedBlocks, chestPoint);
     }
 
     private void fixWallConnections(World world, List<BlockPoint> railingBlocks) {
@@ -760,7 +782,7 @@ public final class PlatformManager {
         return new Location(world, x, y, z);
     }
 
-    private record BuildResult(UUID npcUuid, List<BlockPoint> protectedBlocks) {
+    private record BuildResult(UUID npcUuid, List<BlockPoint> protectedBlocks, BlockPoint chestLocation) {
     }
 
     private record DirectionPair(int forwardX, int forwardZ, int rightX, int rightZ) {

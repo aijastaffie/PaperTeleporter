@@ -15,9 +15,13 @@ import java.util.List;
 
 public final class PtCommand implements CommandExecutor, TabCompleter {
     private final PlatformManager platformManager;
+    private final RoleStore roleStore;
+    private final RoleCommand roleCommand;
 
-    public PtCommand(PlatformManager platformManager) {
+    public PtCommand(PlatformManager platformManager, RoleStore roleStore) {
         this.platformManager = platformManager;
+        this.roleStore = roleStore;
+        this.roleCommand = new RoleCommand(roleStore);
     }
 
     @Override
@@ -161,7 +165,11 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        player.sendMessage(ChatColor.RED + "Unknown action. Use add, remove, rotate, preset, save-preset, spawnpoint or backup.");
+        if ("role".equals(action)) {
+            return roleCommand.execute(player, command, label, java.util.Arrays.copyOfRange(args, 1, args.length));
+        }
+
+        player.sendMessage(ChatColor.RED + "Unknown action. Use add, remove, rotate, preset, save-preset, spawnpoint, backup or role.");
         return true;
     }
 
@@ -189,6 +197,9 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
             }
             if ("backup".startsWith(args[0].toLowerCase())) {
                 options.add("backup");
+            }
+            if ("role".startsWith(args[0].toLowerCase())) {
+                options.add("role");
             }
             return options;
         }
