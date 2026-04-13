@@ -32,28 +32,30 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (args.length != 2) {
-            player.sendMessage(ChatColor.RED + "Usage: /pt <add|remove|rotate> <platformName>");
+        if (args.length < 2) {
+            player.sendMessage(ChatColor.RED + "Usage: /pt <add|remove|rotate|preset> <platformName> [preset]");
             return true;
         }
 
         String action = args[0].toLowerCase();
         String id = args[1];
 
-        if (!id.matches("[a-zA-Z0-9_-]{3,40}")) {
+        if (!action.equals("add") && !id.matches("[a-zA-Z0-9_-]{3,40}")) {
             player.sendMessage(ChatColor.RED + "Platform name must match [a-zA-Z0-9_-] and be 3-40 chars.");
             return true;
         }
 
         if ("add".equals(action)) {
+            if (!id.matches("[a-zA-Z0-9_-]{3,40}")) {
+                player.sendMessage(ChatColor.RED + "Platform name must match [a-zA-Z0-9_-] and be 3-40 chars.");
+                return true;
+            }
             Block target = player.getTargetBlockExact(20);
             if (target == null) {
                 player.sendMessage(ChatColor.RED + "Look at a block within 20 blocks.");
                 return true;
             }
-
-            Location anchor = target.getLocation();
-            player.sendMessage(platformManager.createPlatform(player, id, anchor));
+            player.sendMessage(platformManager.createPlatform(player, id, target.getLocation()));
             return true;
         }
 
@@ -67,7 +69,25 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        player.sendMessage(ChatColor.RED + "Unknown action. Use add, remove or rotate.");
+        if ("preset".equals(action)) {
+            if (args.length != 3) {
+                player.sendMessage(ChatColor.RED + "Usage: /pt preset <platformName> <1-6>");
+                return true;
+            }
+            try {
+                int presetNumber = Integer.parseInt(args[2]);
+                if (!Preset.isValid(presetNumber)) {
+                    player.sendMessage(ChatColor.RED + "Preset must be 1-6.");
+                    return true;
+                }
+                player.sendMessage(platformManager.changePreset(id, presetNumber));
+            } catch (NumberFormatException e) {
+                player.sendMessage(ChatColor.RED + "Preset must be a number 1-6.");
+            }
+            return true;
+        }
+
+        player.sendMessage(ChatColor.RED + "Unknown action. Use add, remove, rotate or preset.");
         return true;
     }
 
@@ -84,19 +104,36 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
             if ("rotate".startsWith(args[0].toLowerCase())) {
                 options.add("rotate");
             }
+            if ("preset".startsWith(args[0].toLowerCase())) {
+                options.add("preset");
+            }
             return options;
         }
 
-        if (args.length == 2 && ("remove".equalsIgnoreCase(args[0]) || "rotate".equalsIgnoreCase(args[0]))) {
-            Collection<PlatformData> platforms = platformManager.allPlatforms();
-            List<String> ids = new ArrayList<>();
-            String prefix = args[1].toLowerCase();
-            for (PlatformData platform : platforms) {
-                if (platform.getId().startsWith(prefix)) {
-                    ids.add(platform.getId());
+        if (args.length == 2) {
+            String action = args[0].toLowerCase();
+            if ("remove".equalsIgnoreCase(action) || "rotate".equalsIgnoreCase(action) || "preset".equalsIgnoreCase(action)) {
+                Collection<PlatformData> platforms = platformManager.allPlatforms();
+                List<String> ids = new ArrayList<>();
+                String prefix = args[1].toLowerCase();
+                for (PlatformData platform : platforms) {
+                    if (platform.getId().startsWith(prefix)) {
+                        ids.add(platform.getId());
+                    }
+                }
+                return ids;
+            }
+        }
+
+        if (args.length == 3 && "preset".equalsIgnoreCase(args[0])) {
+            List<String> presetNumbers = new ArrayList<>();
+            String prefix = args[2];
+            for (int i = 1; i <= 6; i++) {
+                if (String.valueOf(i).startsWith(prefix)) {
+                    presetNumbers.add(String.valueOf(i));
                 }
             }
-            return ids;
+            return presetNumbers;
         }
 
         return List.of();

@@ -3,5 +3,6 @@
   "fence": "OAK_FENCE",
   "spawn": "GOLD_BLOCK",
   "npc": "EMERALD_BLOCK",
-  "light": "SOUL_LANTERN"
+  "light": "SOUL_LANTERN",
+  "stairs": "STONE_BRICK_STAIRS"
 }

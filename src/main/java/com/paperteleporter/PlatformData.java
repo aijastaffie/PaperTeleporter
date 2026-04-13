@@ -17,11 +17,12 @@ public final class PlatformData {
     private UUID npcUuid;
     private List<BlockPoint> protectedBlocks;
     private int directionIndex;
+    private int presetNumber;
 
     public PlatformData() {
     }
 
-    public PlatformData(String id, String worldName, BlockPoint anchor, BlockPoint spawnPoint, UUID npcUuid, List<BlockPoint> protectedBlocks, int directionIndex) {
+    public PlatformData(String id, String worldName, BlockPoint anchor, BlockPoint spawnPoint, UUID npcUuid, List<BlockPoint> protectedBlocks, int directionIndex, int presetNumber) {
         this.id = id;
         this.worldName = worldName;
         this.anchor = anchor;
@@ -29,6 +30,7 @@ public final class PlatformData {
         this.npcUuid = npcUuid;
         this.protectedBlocks = new ArrayList<>(protectedBlocks);
         this.directionIndex = directionIndex;
+        this.presetNumber = presetNumber;
     }
 
     public String getId() {
@@ -69,6 +71,14 @@ public final class PlatformData {
 
     public void setDirectionIndex(int directionIndex) {
         this.directionIndex = directionIndex;
+    }
+
+    public int getPresetNumber() {
+        return presetNumber;
+    }
+
+    public void setPresetNumber(int presetNumber) {
+        this.presetNumber = presetNumber;
     }
 
     public Set<BlockPoint> protectedBlockSet() {

@@ -20,13 +20,15 @@ public final class PlatformMaterials {
     private final Material spawn;
     private final Material npc;
     private final Material light;
+    private final Material stairs;
 
-    private PlatformMaterials(Material platform, Material fence, Material spawn, Material npc, Material light) {
+    private PlatformMaterials(Material platform, Material fence, Material spawn, Material npc, Material light, Material stairs) {
         this.platform = platform;
         this.fence = fence;
         this.spawn = spawn;
         this.npc = npc;
         this.light = light;
+        this.stairs = stairs;
     }
 
     public static PlatformMaterials load(JavaPlugin plugin) throws IOException {
@@ -46,6 +48,7 @@ public final class PlatformMaterials {
         Material spawn = parseMaterial(json, "spawn", Material.GOLD_BLOCK);
         Material npc = parseMaterial(json, "npc", Material.EMERALD_BLOCK);
         Material light = parseMaterial(json, "light", Material.SOUL_LANTERN);
+        Material stairs = parseMaterial(json, "stairs", Material.STONE_BRICK_STAIRS);
 
         JsonObject normalized = new JsonObject();
         normalized.addProperty("platform", platform.name());
@@ -53,9 +56,10 @@ public final class PlatformMaterials {
         normalized.addProperty("spawn", spawn.name());
         normalized.addProperty("npc", npc.name());
         normalized.addProperty("light", light.name());
+        normalized.addProperty("stairs", stairs.name());
         Files.writeString(path, GSON.toJson(normalized), StandardCharsets.UTF_8);
 
-        return new PlatformMaterials(platform, fence, spawn, npc, light);
+        return new PlatformMaterials(platform, fence, spawn, npc, light, stairs);
     }
 
     private static Material parseMaterial(JsonObject json, String key, Material fallback) {
@@ -85,5 +89,9 @@ public final class PlatformMaterials {
 
     public Material light() {
         return light;
+    }
+
+    public Material stairs() {
+        return stairs;
     }
 }

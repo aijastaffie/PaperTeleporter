@@ -6,6 +6,12 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.Directional;
+import org.bukkit.block.data.type.Stairs;
+import org.bukkit.block.data.type.Wall;
+import org.bukkit.block.data.type.Wall.Height;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
@@ -76,9 +82,17 @@ public final class PlatformManager {
     }
 
     public String createPlatform(Player player, String idInput, Location anchorLocation) {
+        return createPlatformWithPreset(player, idInput, anchorLocation, 2); // Default FENCED
+    }
+
+    public String createPlatformWithPreset(Player player, String idInput, Location anchorLocation, int presetNumber) {
         String id = idInput.toLowerCase();
         if (containsId(id)) {
             return ChatColor.RED + "Platform id already exists: " + id;
+        }
+
+        if (!Preset.isValid(presetNumber)) {
+            return ChatColor.RED + "Invalid preset number. Valid: 1-6";
         }
 
         World world = anchorLocation.getWorld();
@@ -97,10 +111,11 @@ public final class PlatformManager {
         int centerZ = baseZ + (direction.rightZ * 6) + (direction.forwardZ * 3);
 
         BlockPoint center = new BlockPoint(centerX, centerY, centerZ);
-        BuildResult result = buildPlatform(world, center, direction);
+        Preset preset = Preset.fromNumber(presetNumber);
+        BuildResult result = buildPlatform(world, center, direction, preset);
 
         BlockPoint anchor = BlockPoint.fromLocation(anchorLocation);
-        PlatformData data = new PlatformData(id, world.getName(), anchor, center, result.npcUuid(), result.protectedBlocks(), direction.toIndex());
+        PlatformData data = new PlatformData(id, world.getName(), anchor, center, result.npcUuid(), result.protectedBlocks(), direction.toIndex(), presetNumber);
 
         byId.put(id, data);
         byNpc.put(result.npcUuid(), data);
@@ -111,7 +126,7 @@ public final class PlatformManager {
             plugin.getLogger().warning("Failed to save platforms.json: " + e.getMessage());
         }
 
-        return ChatColor.GREEN + "Platform created with id " + id;
+        return ChatColor.GREEN + "Platform created with id " + id + " (preset " + presetNumber + ")";
     }
 
     public String rotatePlatform(String idInput) {
@@ -139,7 +154,8 @@ public final class PlatformManager {
         DirectionPair current = DirectionPair.fromIndex(data.getDirectionIndex());
         DirectionPair rotated = current.rotate90CounterClockwise();
 
-        BuildResult result = buildPlatform(world, data.getSpawnPoint(), rotated);
+        Preset preset = Preset.fromNumber(data.getPresetNumber());
+        BuildResult result = buildPlatform(world, data.getSpawnPoint(), rotated, preset);
         data.setDirectionIndex(rotated.toIndex());
         data.setNpcUuid(result.npcUuid());
         data.setProtectedBlocks(result.protectedBlocks());
@@ -195,12 +211,59 @@ public final class PlatformManager {
         player.sendMessage(ChatColor.GREEN + "Teleported to platform " + data.getId());
     }
 
-    private BuildResult buildPlatform(World world, BlockPoint center, DirectionPair direction) {
+    public String changePreset(String idInput, int newPresetNumber) {
+        String id = idInput.toLowerCase();
+        PlatformData data = byId.get(id);
+        if (data == null) {
+            return ChatColor.RED + "Unknown platform id: " + id;
+        }
+
+        if (data.getPresetNumber() == newPresetNumber) {
+            return ChatColor.YELLOW + "Platform " + id + " is already preset " + newPresetNumber;
+        }
+
+        World world = Bukkit.getWorld(data.getWorldName());
+        if (world == null) {
+            return ChatColor.RED + "Target world for platform is not loaded.";
+        }
+
+        for (BlockPoint block : data.getProtectedBlocks()) {
+            world.getBlockAt(block.getX(), block.getY(), block.getZ()).setType(Material.AIR, false);
+        }
+
+        UUID oldNpcUuid = data.getNpcUuid();
+        Entity oldNpc = world.getEntity(oldNpcUuid);
+        if (oldNpc != null) {
+            oldNpc.remove();
+        }
+
+        DirectionPair direction = DirectionPair.fromIndex(data.getDirectionIndex());
+        Preset newPreset = Preset.fromNumber(newPresetNumber);
+        BuildResult result = buildPlatform(world, data.getSpawnPoint(), direction, newPreset);
+
+        data.setPresetNumber(newPresetNumber);
+        data.setNpcUuid(result.npcUuid());
+        data.setProtectedBlocks(result.protectedBlocks());
+
+        byNpc.remove(oldNpcUuid);
+        byNpc.put(result.npcUuid(), data);
+
+        try {
+            save();
+        } catch (IOException e) {
+            plugin.getLogger().warning("Failed to save platforms.json: " + e.getMessage());
+        }
+
+        return ChatColor.GREEN + "Changed platform " + id + " to preset " + newPresetNumber;
+    }
+
+    private BuildResult buildPlatform(World world, BlockPoint center, DirectionPair direction, Preset preset) {
         int centerX = center.getX();
         int centerY = center.getY();
         int centerZ = center.getZ();
 
         List<BlockPoint> protectedBlocks = new ArrayList<>();
+        List<BlockPoint> railingBlocks = new ArrayList<>();
 
         for (int r = 0; r < 7; r++) {
             for (int f = 0; f < 7; f++) {
@@ -217,14 +280,40 @@ public final class PlatformManager {
                     floorBlock.setType(materials.spawn(), false);
                 } else if (r == 3 && f == 2) {
                     floorBlock.setType(materials.npc(), false);
+                } else if (f == 6 && r >= 2 && r <= 4 && (preset == Preset.FENCED)) {
+                    floorBlock.setType(materials.stairs(), false);
+                    BlockData stairData = floorBlock.getBlockData();
+                    if (stairData instanceof Stairs stairs) {
+                        stairs.setFacing(direction.openingFace());
+                        floorBlock.setBlockData(stairs, false);
+                    }
                 } else {
                     floorBlock.setType(materials.platform(), false);
                 }
 
                 boolean perimeter = r == 0 || r == 6 || f == 0 || f == 6;
                 boolean opening = f == 6 && r >= 2 && r <= 4;
+                
                 if (perimeter && !opening) {
-                    world.getBlockAt(x, centerY + 1, z).setType(materials.fence(), false);
+                    Block railBlock = world.getBlockAt(x, centerY + 1, z);
+                    if (preset == Preset.OPEN) {
+                        railBlock.setType(Material.AIR, false);
+                    } else if (preset == Preset.FENCED) {
+                        railBlock.setType(materials.fence(), false);
+                        railingBlocks.add(BlockPoint.fromLocation(railBlock.getLocation()));
+                    } else if (preset == Preset.ENCLOSED) {
+                        railBlock.setType(Material.BRICK_WALL, false);
+                        railingBlocks.add(BlockPoint.fromLocation(railBlock.getLocation()));
+                    } else if (preset == Preset.TOWERING) {
+                        railBlock.setType(materials.fence(), false);
+                        railingBlocks.add(BlockPoint.fromLocation(railBlock.getLocation()));
+                        if (r == 0 && f == 0 || r == 0 && f == 6 || r == 6 && f == 0 || r == 6 && f == 6) {
+                            world.getBlockAt(x, centerY + 2, z).setType(materials.fence(), false);
+                        }
+                    } else if (preset == Preset.FLAT_ROOF) {
+                        railBlock.setType(Material.GRAY_CONCRETE, false);
+                        railingBlocks.add(BlockPoint.fromLocation(railBlock.getLocation()));
+                    }
                 }
             }
         }
@@ -233,6 +322,8 @@ public final class PlatformManager {
         placeLight(world, centerX, centerY + 2, centerZ, direction, 6, 0);
         placeLight(world, centerX, centerY + 2, centerZ, direction, 0, 6);
         placeLight(world, centerX, centerY + 2, centerZ, direction, 6, 6);
+
+        fixWallConnections(world, railingBlocks);
 
         Location npcLocation = relativeLocation(world, centerX, centerY + 1, centerZ, direction, 3, 2).add(0.5, 0.0, 0.5);
         Location openingCenter = relativeLocation(world, centerX, centerY + 1, centerZ, direction, 3, 6).add(0.5, 0.0, 0.5);
@@ -246,6 +337,20 @@ public final class PlatformManager {
         villager.setPersistent(true);
 
         return new BuildResult(villager.getUniqueId(), protectedBlocks);
+    }
+
+    private void fixWallConnections(World world, List<BlockPoint> railingBlocks) {
+        for (BlockPoint block : railingBlocks) {
+            Block b = world.getBlockAt(block.getX(), block.getY(), block.getZ());
+            BlockData data = b.getBlockData();
+            if (data instanceof Wall wall) {
+                wall.setHeight(BlockFace.NORTH, Height.LOW);
+                wall.setHeight(BlockFace.SOUTH, Height.LOW);
+                wall.setHeight(BlockFace.EAST, Height.LOW);
+                wall.setHeight(BlockFace.WEST, Height.LOW);
+                b.setBlockData(wall, false);
+            }
+        }
     }
 
     private void placeLight(World world, int centerX, int y, int centerZ, DirectionPair direction, int r, int f) {
@@ -263,6 +368,19 @@ public final class PlatformManager {
     }
 
     private record DirectionPair(int forwardX, int forwardZ, int rightX, int rightZ) {
+        BlockFace openingFace() {
+            if (forwardX == 1) {
+                return BlockFace.EAST;
+            }
+            if (forwardX == -1) {
+                return BlockFace.WEST;
+            }
+            if (forwardZ == 1) {
+                return BlockFace.SOUTH;
+            }
+            return BlockFace.NORTH;
+        }
+
         DirectionPair rotate180() {
             return new DirectionPair(-forwardX, -forwardZ, -rightX, -rightZ);
         }
