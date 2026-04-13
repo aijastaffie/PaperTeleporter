@@ -1,4 +1,4 @@
-# PaperTeleporter
+# PaperTeleporterADV
 
 PaperMC plugin for building protected 7x7 teleport platforms that form a teleport network through NPC interaction.
 
@@ -39,12 +39,12 @@ PaperMC plugin for building protected 7x7 teleport platforms that form a telepor
 - Platform area is protected from non-OP block break/place
 - OP in creative mode can bypass protection (for admin cleanup/building)
 - Prevents overlapping platforms and enforces minimum spawn distance
-- Platform data persists to `plugins/PaperTeleporter/platforms.json`
-- Material config stored in `plugins/PaperTeleporter/platform-materials.json`
-- Custom presets persist to `plugins/PaperTeleporter/custom-presets.json`
+- Platform data persists to `plugins/PaperTeleporterADV/platforms.json`
+- Material config stored in `plugins/PaperTeleporterADV/platform-materials.json`
+- Custom presets persist to `plugins/PaperTeleporterADV/custom-presets.json`
 - Automatic backup + restore for platform/preset data:
-  - current backup: `plugins/PaperTeleporter-backups/current/`
-  - timestamp snapshots: `plugins/PaperTeleporter-backups/snapshots/`
+  - current backup: `plugins/PaperTeleporterADV-backups/current/`
+  - timestamp snapshots: `plugins/PaperTeleporterADV-backups/snapshots/`
 
 ## Build
 
@@ -98,12 +98,12 @@ The plugin JAR is generated under `build/libs/`.
 1. Stop server.
 2. (Recommended) run `/pt backup now` before stopping, to force a fresh checkpoint.
 3. Replace plugin JAR as usual.
-4. Do **not** delete `plugins/PaperTeleporter-backups/`.
-5. If `plugins/PaperTeleporter/` was deleted accidentally, plugin restores `platforms.json` and `custom-presets.json` from `plugins/PaperTeleporter-backups/current/` on startup.
+4. Do **not** delete `plugins/PaperTeleporterADV-backups/`.
+5. If `plugins/PaperTeleporterADV/` was deleted accidentally, plugin restores `platforms.json` and `custom-presets.json` from `plugins/PaperTeleporterADV-backups/current/` on startup.
 
 Important:
-- If both `plugins/PaperTeleporter/` and `plugins/PaperTeleporter-backups/` are deleted, metadata is lost and existing world structures become unmanaged. In that case, cleanup must be done manually.
+- If both `plugins/PaperTeleporterADV/` and `plugins/PaperTeleporterADV-backups/` are deleted, metadata is lost and existing world structures become unmanaged. In that case, cleanup must be done manually.
 
 Folder creation behavior:
-- `plugins/PaperTeleporter/` is created by plugin normal data writes.
-- `plugins/PaperTeleporter-backups/` is created when backup files are written (automatic on save, or immediately via `/pt backup now`).
+- `plugins/PaperTeleporterADV/` is created by plugin normal data writes.
+- `plugins/PaperTeleporterADV-backups/` is created when backup files are written (automatic on save, or immediately via `/pt backup now`).

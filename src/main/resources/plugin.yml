@@ -1,11 +1,11 @@
-name: PaperTeleporter
+name: PaperTeleporterADV
 main: com.paperteleporter.PaperTeleporterPlugin
 version: 0.1.0
 api-version: '1.21'
-author: PaperTeleporter
+author: PaperTeleporterADV
 commands:
   pt:
-    description: PaperTeleporter main command.
+    description: PaperTeleporterADV main command.
     usage: /pt <add|remove|rotate|preset|save-preset|spawnpoint|backup> ...
     permission: paperteleporter.admin
 permissions:
