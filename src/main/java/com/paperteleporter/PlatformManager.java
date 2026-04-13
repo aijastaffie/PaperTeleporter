@@ -113,9 +113,9 @@ public final class PlatformManager {
         int baseY = anchorLocation.getBlockY() + 1;
         int baseZ = anchorLocation.getBlockZ();
 
-        int centerX = baseX + (direction.rightX * 3) + (direction.forwardX * 3);
+        int centerX = baseX - (direction.forwardX * 3);
         int centerY = baseY;
-        int centerZ = baseZ + (direction.rightZ * 3) + (direction.forwardZ * 3);
+        int centerZ = baseZ - (direction.forwardZ * 3);
 
         BlockPoint center = new BlockPoint(centerX, centerY, centerZ);
         Preset preset = Preset.fromNumber(presetNumber);
