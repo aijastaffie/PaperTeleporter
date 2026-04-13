@@ -1,0 +1,13 @@
+name: PaperTeleporter
+main: com.paperteleporter.PaperTeleporterPlugin
+version: 0.1.0
+api-version: '1.21'
+author: PaperTeleporter
+commands:
+  pt:
+    description: PaperTeleporter main command.
+    usage: /pt <add|remove|rotate> <platformName>
+    permission: paperteleporter.admin
+permissions:
+  paperteleporter.admin:
+    default: op

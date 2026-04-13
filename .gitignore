@@ -1,0 +1,8 @@
+.gradle/
+build/
+out/
+.idea/
+.vscode/
+
+# Local project bootstrap notes
+project_start_info.md
