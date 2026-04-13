@@ -6,7 +6,7 @@ author: PaperTeleporter
 commands:
   pt:
     description: PaperTeleporter main command.
-    usage: /pt <add|remove|rotate> <platformName>
+    usage: /pt <add|remove|rotate|preset|save-preset|spawnpoint|backup> ...
     permission: paperteleporter.admin
 permissions:
   paperteleporter.admin:

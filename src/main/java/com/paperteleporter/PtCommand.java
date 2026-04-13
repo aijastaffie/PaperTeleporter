@@ -33,7 +33,7 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length < 1) {
-            player.sendMessage(ChatColor.RED + "Usage: /pt <add|remove|rotate|preset|spawnpoint> <platformName> [preset]");
+            player.sendMessage(ChatColor.RED + "Usage: /pt <add|remove|rotate|preset|save-preset|spawnpoint|backup> ...");
             return true;
         }
 
@@ -46,6 +46,10 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
         }
 
         if ("add".equals(action)) {
+            if (args.length < 2 || args.length > 3) {
+                player.sendMessage(ChatColor.RED + "Usage: /pt add <platformName> [presetNumber]");
+                return true;
+            }
             if (!id.matches("[a-zA-Z0-9_-]{3,40}")) {
                 player.sendMessage(ChatColor.RED + "Platform name must match [a-zA-Z0-9_-] and be 3-40 chars.");
                 return true;
@@ -55,7 +59,22 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
                 player.sendMessage(ChatColor.RED + "Look at a block within 20 blocks.");
                 return true;
             }
-            player.sendMessage(platformManager.createPlatform(player, id, target.getLocation()));
+            if (target.getType() == org.bukkit.Material.SNOW) {
+                target = target.getRelative(org.bukkit.block.BlockFace.DOWN);
+            }
+            Location anchorLocation = target.getLocation().add(0, 1, 0);
+
+            if (args.length == 2) {
+                player.sendMessage(platformManager.createPlatform(player, id, anchorLocation));
+                return true;
+            }
+
+            try {
+                int presetNumber = Integer.parseInt(args[2]);
+                player.sendMessage(platformManager.createPlatformWithPreset(player, id, anchorLocation, presetNumber));
+            } catch (NumberFormatException e) {
+                player.sendMessage(ChatColor.RED + "Preset number must be a number.");
+            }
             return true;
         }
 
@@ -92,43 +111,26 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             if (args.length != 3) {
-                player.sendMessage(ChatColor.RED + "Usage: /pt preset <platformName> <1-6>");
+                player.sendMessage(ChatColor.RED + "Usage: /pt preset <platformName> <presetNumber>");
                 return true;
             }
             try {
                 int presetNumber = Integer.parseInt(args[2]);
-                if (!Preset.isValid(presetNumber)) {
-                    player.sendMessage(ChatColor.RED + "Preset must be 1-6.");
-                    return true;
-                }
                 player.sendMessage(platformManager.changePreset(id, presetNumber));
             } catch (NumberFormatException e) {
-                player.sendMessage(ChatColor.RED + "Preset must be a number 1-6.");
+                player.sendMessage(ChatColor.RED + "Preset must be a number.");
             }
             return true;
         }
 
         if ("save-preset".equals(action)) {
-            if (args.length != 3) {
-                player.sendMessage(ChatColor.RED + "Usage: /pt save-preset <name> <number>");
+            if (args.length != 1) {
+                player.sendMessage(ChatColor.RED + "Usage: /pt save-preset");
                 return true;
             }
-            String presetName = id;
-            try {
-                int presetNumber = Integer.parseInt(args[2]);
-                if (presetNumber < 1 || presetNumber > 99) {
-                    player.sendMessage(ChatColor.RED + "Custom preset number must be 1-99.");
-                    return true;
-                }
-                Block targetBlock = player.getTargetBlockExact(20);
-                if (targetBlock == null) {
-                    player.sendMessage(ChatColor.RED + "Look at a block within 20 blocks. This will be the center of the 7x7x7.");
-                    return true;
-                }
-                player.sendMessage(platformManager.saveCustomPreset(player, presetName, presetNumber, targetBlock.getLocation()));
-            } catch (NumberFormatException e) {
-                player.sendMessage(ChatColor.RED + "Preset number must be a number.");
-            }
+
+            Location centerLocation = player.getLocation().clone().subtract(0, 1, 0).getBlock().getRelative(org.bukkit.block.BlockFace.UP).getLocation();
+            player.sendMessage(platformManager.saveCustomPreset(player, centerLocation));
             return true;
         }
 
@@ -150,7 +152,16 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        player.sendMessage(ChatColor.RED + "Unknown action. Use add, remove, rotate, preset or spawnpoint.");
+        if ("backup".equals(action)) {
+            if (args.length != 2 || !"now".equalsIgnoreCase(args[1])) {
+                player.sendMessage(ChatColor.RED + "Usage: /pt backup now");
+                return true;
+            }
+            player.sendMessage(platformManager.createManualBackup());
+            return true;
+        }
+
+        player.sendMessage(ChatColor.RED + "Unknown action. Use add, remove, rotate, preset, save-preset, spawnpoint or backup.");
         return true;
     }
 
@@ -175,6 +186,9 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
             }
             if ("spawnpoint".startsWith(args[0].toLowerCase())) {
                 options.add("spawnpoint");
+            }
+            if ("backup".startsWith(args[0].toLowerCase())) {
+                options.add("backup");
             }
             return options;
         }
@@ -207,28 +221,38 @@ public final class PtCommand implements CommandExecutor, TabCompleter {
                 return ids;
             }
             if ("save-preset".equalsIgnoreCase(action)) {
-                return new ArrayList<>(); // Name suggestions could be empty or populated from history
+                return List.of();
+            }
+            if ("backup".equalsIgnoreCase(action)) {
+                if ("now".startsWith(args[1].toLowerCase())) {
+                    return List.of("now");
+                }
+                return List.of();
             }
         }
 
         if (args.length == 3) {
             String action = args[0].toLowerCase();
-            if ("preset".equalsIgnoreCase(action)) {
+            if ("add".equalsIgnoreCase(action)) {
                 List<String> presetNumbers = new ArrayList<>();
                 String prefix = args[2];
-                for (int i = 1; i <= 6; i++) {
-                    if (String.valueOf(i).startsWith(prefix)) {
-                        presetNumbers.add(String.valueOf(i));
+                for (int i = 1; i <= 99; i++) {
+                    if (i <= 6 || platformManager.getCustomPreset(i) != null) {
+                        if (String.valueOf(i).startsWith(prefix)) {
+                            presetNumbers.add(String.valueOf(i));
+                        }
                     }
                 }
                 return presetNumbers;
             }
-            if ("save-preset".equalsIgnoreCase(action)) {
+            if ("preset".equalsIgnoreCase(action)) {
                 List<String> presetNumbers = new ArrayList<>();
                 String prefix = args[2];
                 for (int i = 1; i <= 99; i++) {
-                    if (String.valueOf(i).startsWith(prefix)) {
-                        presetNumbers.add(String.valueOf(i));
+                    if (i <= 6 || platformManager.getCustomPreset(i) != null) {
+                        if (String.valueOf(i).startsWith(prefix)) {
+                            presetNumbers.add(String.valueOf(i));
+                        }
                     }
                 }
                 return presetNumbers;

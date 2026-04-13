@@ -12,18 +12,27 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 public final class PlatformStore {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Type LIST_TYPE = new TypeToken<List<PlatformData>>() {}.getType();
 
     private final Path path;
+    private final Path backupCurrentPath;
+    private final Path backupSnapshotsDir;
+    private final Logger logger;
 
     public PlatformStore(JavaPlugin plugin) {
         this.path = plugin.getDataFolder().toPath().resolve("platforms.json");
+        Path backupsRoot = plugin.getDataFolder().toPath().getParent().resolve("PaperTeleporter-backups");
+        this.backupCurrentPath = backupsRoot.resolve("current").resolve("platforms.json");
+        this.backupSnapshotsDir = backupsRoot.resolve("snapshots");
+        this.logger = plugin.getLogger();
     }
 
     public List<PlatformData> load() throws IOException {
+        DataFileBackup.restorePrimaryIfMissing(path, backupCurrentPath, logger);
         if (Files.notExists(path)) {
             return new ArrayList<>();
         }
@@ -35,5 +44,6 @@ public final class PlatformStore {
     public void save(List<PlatformData> platforms) throws IOException {
         Files.createDirectories(path.getParent());
         Files.writeString(path, GSON.toJson(platforms), StandardCharsets.UTF_8);
+        DataFileBackup.writeBackups(path, backupCurrentPath, backupSnapshotsDir, logger);
     }
 }

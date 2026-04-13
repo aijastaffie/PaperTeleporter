@@ -42,20 +42,32 @@ public final class CustomPresetData {
         this.blocks = new ArrayList<>(blocks);
     }
 
+    private int saveDirectionCwSteps;
+
+    public int getSaveDirectionCwSteps() {
+        return saveDirectionCwSteps;
+    }
+
+    public void setSaveDirectionCwSteps(int saveDirectionCwSteps) {
+        this.saveDirectionCwSteps = saveDirectionCwSteps;
+    }
+
     public static final class BlockEntry {
         private int x;
         private int y;
         private int z;
         private String material;
+        private String blockData;
 
         public BlockEntry() {
         }
 
-        public BlockEntry(int x, int y, int z, String material) {
+        public BlockEntry(int x, int y, int z, String material, String blockData) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.material = material;
+            this.blockData = blockData;
         }
 
         public int getX() {
@@ -72,6 +84,10 @@ public final class CustomPresetData {
 
         public String getMaterial() {
             return material;
+        }
+
+        public String getBlockData() {
+            return blockData;
         }
     }
 }

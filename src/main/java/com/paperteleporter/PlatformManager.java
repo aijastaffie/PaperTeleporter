@@ -13,6 +13,7 @@ import org.bukkit.block.data.type.Stairs;
 import org.bukkit.block.data.type.Wall;
 import org.bukkit.block.data.type.Wall.Height;
 import org.bukkit.block.data.type.Fence;
+import org.bukkit.block.data.type.Lantern;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
@@ -69,6 +70,17 @@ public final class PlatformManager {
         store.save(new ArrayList<>(byId.values()));
     }
 
+    public String createManualBackup() {
+        try {
+            store.save(new ArrayList<>(byId.values()));
+            customPresetStore.save(customPresets);
+            return ChatColor.GREEN + "Manual backup created in plugins/PaperTeleporter-backups/.";
+        } catch (IOException e) {
+            plugin.getLogger().warning("Failed to create manual backup: " + e.getMessage());
+            return ChatColor.RED + "Failed to create manual backup. Check server logs.";
+        }
+    }
+
     public void reloadMaterials(PlatformMaterials materials) {
         this.materials = materials;
     }
@@ -101,10 +113,49 @@ public final class PlatformManager {
         return customPresets.get(number);
     }
 
-    public String saveCustomPreset(Player player, String presetName, int presetNumber, Location centerLocation) {
-        if (customPresets.containsKey(presetNumber)) {
-            return ChatColor.YELLOW + "Custom preset " + presetNumber + " already exists. Use /pt preset remove " + presetNumber + " first.";
+    private int findNextFreeCustomPresetNumber() {
+        for (int i = 7; i <= 99; i++) {
+            if (!customPresets.containsKey(i)) {
+                return i;
+            }
         }
+        return -1;
+    }
+
+    // CW steps from South: S=0, W=1, N=2, E=3
+    private int facingToCwSteps(BlockFace face) {
+        return switch (face) {
+            case SOUTH -> 0;
+            case WEST -> 1;
+            case NORTH -> 2;
+            case EAST -> 3;
+            default -> 0;
+        };
+    }
+
+    private BlockFace rotateFaceCw(BlockFace face, int steps) {
+        BlockFace[] ring = {BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST};
+        for (int i = 0; i < ring.length; i++) {
+            if (ring[i] == face) {
+                return ring[(i + steps) % 4];
+            }
+        }
+        return face; // UP, DOWN, non-cardinal: unchanged
+    }
+
+    private void rotateBlockDataCw(BlockData blockData, int steps) {
+        if (steps == 0) return;
+        if (blockData instanceof Directional directional) {
+            directional.setFacing(rotateFaceCw(directional.getFacing(), steps));
+        }
+    }
+
+    public String saveCustomPreset(Player player, Location centerLocation) {
+        int presetNumber = findNextFreeCustomPresetNumber();
+        if (presetNumber == -1) {
+            return ChatColor.RED + "No free custom preset slots left (7-99).";
+        }
+        String presetName = "custom-" + presetNumber;
 
         World world = centerLocation.getWorld();
         if (world == null) {
@@ -112,6 +163,19 @@ public final class PlatformManager {
         }
 
         BlockPoint center = BlockPoint.fromLocation(centerLocation);
+
+        // Center floor must stay empty in template build phase; spawn block is added only when platform is created.
+        Block centerBlock = world.getBlockAt(center.getX(), center.getY(), center.getZ());
+        if (!isIgnorableTemplateBlock(centerBlock.getType())) {
+            return ChatColor.RED + "Center block must be AIR. Stand in the center hole when saving preset.";
+        }
+
+        // Require one-block-deep center hole: block below center must not be air.
+        Block belowCenter = world.getBlockAt(center.getX(), center.getY() - 1, center.getZ());
+        if (belowCenter.getType().isAir()) {
+            return ChatColor.RED + "Stand in a 1-block-deep center hole before saving preset.";
+        }
+
         List<CustomPresetData.BlockEntry> blocks = new ArrayList<>();
 
         for (int r = 0; r < 7; r++) {
@@ -121,15 +185,19 @@ public final class PlatformManager {
                     int blockY = center.getY() + y;
                     int z = center.getZ() - 3 + f;
                     Block block = world.getBlockAt(x, blockY, z);
-                    if (block.getType() != Material.AIR) {
-                        blocks.add(new CustomPresetData.BlockEntry(r, y, f, block.getType().name()));
+                    if (!isIgnorableTemplateBlock(block.getType())) {
+                        blocks.add(new CustomPresetData.BlockEntry(r, y, f, block.getType().name(), block.getBlockData().getAsString()));
                     }
                     world.getBlockAt(x, blockY, z).setType(Material.AIR, false);
                 }
             }
         }
 
+        // player's actual facing at save time (without rotate180)
+        int saveCwSteps = facingToCwSteps(DirectionPair.fromYaw(player.getLocation().getYaw()).openingFace());
+
         CustomPresetData data = new CustomPresetData(presetNumber, presetName, blocks);
+        data.setSaveDirectionCwSteps(saveCwSteps);
         customPresets.put(presetNumber, data);
 
         try {
@@ -139,9 +207,16 @@ public final class PlatformManager {
             return ChatColor.RED + "Failed to save custom preset.";
         }
 
-        addDefaultStructure(world, center);
-        return ChatColor.GREEN + "Custom preset " + presetNumber + " (\"" + presetName + "\") saved and area cleared.";
+            return ChatColor.GREEN + "Custom preset " + presetNumber + " saved and template area cleared."
+                + ChatColor.GRAY + " (stand position used as center)";
     }
+
+            private boolean isIgnorableTemplateBlock(Material material) {
+            return material == Material.AIR
+                || material == Material.CAVE_AIR
+                || material == Material.VOID_AIR
+                || material == Material.SNOW;
+            }
 
     public String removeCustomPreset(int presetNumber) {
         if (!customPresets.containsKey(presetNumber)) {
@@ -160,7 +235,7 @@ public final class PlatformManager {
     private void addDefaultStructure(World world, BlockPoint center) {
         world.getBlockAt(center.getX(), center.getY(), center.getZ()).setType(materials.spawn(), false);
         world.getBlockAt(center.getX(), center.getY(), center.getZ() - 1).setType(materials.npc(), false);
-        int lightY = center.getY() + 6;
+        int lightY = center.getY() + 2;
         world.getBlockAt(center.getX() - 3, lightY, center.getZ() - 3).setType(materials.light(), false);
         world.getBlockAt(center.getX() - 3, lightY, center.getZ() + 3).setType(materials.light(), false);
         world.getBlockAt(center.getX() + 3, lightY, center.getZ() - 3).setType(materials.light(), false);
@@ -193,8 +268,8 @@ public final class PlatformManager {
         // Check if it's a custom preset or built-in
         boolean isCustom = presetNumber > 6;
         if (isCustom) {
-            if (presetNumber < 1 || presetNumber > 99) {
-                return ChatColor.RED + "Invalid custom preset number. Valid: 1-99";
+            if (presetNumber < 7 || presetNumber > 99) {
+                return ChatColor.RED + "Invalid custom preset number. Valid: 7-99";
             }
             if (customPresets == null || !customPresets.containsKey(presetNumber)) {
                 return ChatColor.RED + "Custom preset " + presetNumber + " not found.";
@@ -351,6 +426,18 @@ public final class PlatformManager {
             return ChatColor.YELLOW + "Platform " + id + " is already preset " + newPresetNumber;
         }
 
+        boolean isCustom = newPresetNumber > 6;
+        if (isCustom) {
+            if (newPresetNumber < 7 || newPresetNumber > 99) {
+                return ChatColor.RED + "Invalid custom preset number. Valid: 7-99";
+            }
+            if (!customPresets.containsKey(newPresetNumber)) {
+                return ChatColor.RED + "Custom preset " + newPresetNumber + " not found.";
+            }
+        } else if (!Preset.isValid(newPresetNumber)) {
+            return ChatColor.RED + "Invalid preset number. Valid: 1-6 (built-in) or 7-99 (custom)";
+        }
+
         World world = Bukkit.getWorld(data.getWorldName());
         if (world == null) {
             return ChatColor.RED + "Target world for platform is not loaded.";
@@ -367,8 +454,13 @@ public final class PlatformManager {
         }
 
         DirectionPair direction = DirectionPair.fromIndex(data.getDirectionIndex());
-        Preset newPreset = Preset.fromNumber(newPresetNumber);
-        BuildResult result = buildPlatform(world, data.getSpawnPoint(), direction, newPreset);
+        BuildResult result;
+        if (isCustom) {
+            result = buildCustomPlatform(world, data.getSpawnPoint(), direction, customPresets.get(newPresetNumber));
+        } else {
+            Preset newPreset = Preset.fromNumber(newPresetNumber);
+            result = buildPlatform(world, data.getSpawnPoint(), direction, newPreset);
+        }
 
         data.setPresetNumber(newPresetNumber);
         data.setNpcUuid(result.npcUuid());
@@ -479,25 +571,47 @@ public final class PlatformManager {
                     int roofY = centerY + 2 + (3 - distFromCenter);
                     Location roofLocation = relativeLocation(world, centerX, roofY, centerZ, direction, r, f);
                     Block roofBlock = world.getBlockAt(roofLocation);
-                    roofBlock.setType(Material.OAK_STAIRS, false);
-                    BlockData roofData = roofBlock.getBlockData();
-                    if (roofData instanceof Directional directional) {
-                        if (r < 3) {
-                            directional.setFacing(direction.rightFace());
-                        } else if (r > 3) {
-                            directional.setFacing(direction.rightFaceOpposite());
+                    if (r == 3) {
+                        roofBlock.setType(Material.OAK_LOG, false);
+                    } else {
+                        roofBlock.setType(Material.OAK_STAIRS, false);
+                        BlockData roofData = roofBlock.getBlockData();
+                        if (roofData instanceof Directional directional) {
+                            if (r < 3) {
+                                directional.setFacing(direction.rightFace());
+                            } else if (r > 3) {
+                                directional.setFacing(direction.rightFaceOpposite());
+                            }
+                            roofBlock.setBlockData(directional, false);
                         }
-                        roofBlock.setBlockData(directional, false);
                     }
                 }
             }
         }
 
-        int lightY = (preset == Preset.OPEN) ? centerY + 1 : centerY + 6;
-        placeLight(world, centerX, lightY, centerZ, direction, 0, 0);
-        placeLight(world, centerX, lightY, centerZ, direction, 6, 0);
-        placeLight(world, centerX, lightY, centerZ, direction, 0, 6);
-        placeLight(world, centerX, lightY, centerZ, direction, 6, 6);
+        if (preset == Preset.GABLE_ROOF) {
+            int ridgeY = centerY + 5;
+            for (int f : new int[]{0, 6}) {
+                Location lanternLoc = relativeLocation(world, centerX, ridgeY - 1, centerZ, direction, 3, f);
+                Block lanternBlock = world.getBlockAt(lanternLoc);
+                lanternBlock.setType(Material.LANTERN, false);
+                BlockData lanternData = lanternBlock.getBlockData();
+                if (lanternData instanceof Lantern lantern) {
+                    lantern.setHanging(true);
+                    lanternBlock.setBlockData(lantern, false);
+                }
+            }
+        } else {
+            int lightY = switch (preset) {
+                case OPEN -> centerY + 1;
+                case FENCED -> centerY + 2;
+                default -> centerY + 6;
+            };
+            placeLight(world, centerX, lightY, centerZ, direction, 0, 0);
+            placeLight(world, centerX, lightY, centerZ, direction, 6, 0);
+            placeLight(world, centerX, lightY, centerZ, direction, 0, 6);
+            placeLight(world, centerX, lightY, centerZ, direction, 6, 6);
+        }
 
         fixWallConnections(world, railingBlocks);
 
@@ -521,6 +635,7 @@ public final class PlatformManager {
         int centerZ = center.getZ();
 
         List<BlockPoint> protectedBlocks = new ArrayList<>();
+        List<BlockPoint> railingBlocks = new ArrayList<>();
 
         // Clear the 7x7x7 area first
         for (int r = 0; r < 7; r++) {
@@ -535,6 +650,12 @@ public final class PlatformManager {
             }
         }
 
+        // Compute rotation delta: how many CW steps to rotate block data so it matches the new placement direction.
+        // build direction facing (player's actual facing at build time) = direction.openingFaceOpposite()
+        int buildCwSteps = facingToCwSteps(direction.openingFaceOpposite());
+        int saveCwSteps = customPreset.getSaveDirectionCwSteps();
+        int rotateDelta = (buildCwSteps - saveCwSteps + 4) % 4;
+
         // Place custom blocks from the preset data
         if (customPreset.getBlocks() != null) {
             for (CustomPresetData.BlockEntry entry : customPreset.getBlocks()) {
@@ -542,30 +663,46 @@ public final class PlatformManager {
                 int ry = entry.getY();
                 int rz = entry.getZ();
                 Material material = Material.matchMaterial(entry.getMaterial());
-                
+
                 if (material == null) {
                     plugin.getLogger().warning("Unknown material in custom preset: " + entry.getMaterial());
                     continue;
                 }
 
-                // Transform relative coordinates (1-7) to world coordinates
-                // rx=1 → -3, rx=4 → 0, rx=7 → +3 (using right vector)
-                // rz=1 → -3, rz=4 → 0, rz=7 → +3 (using forward vector)
-                int worldX = centerX + direction.rightX * (rx - 4) + direction.forwardX * (rz - 4);
-                int worldY = centerY + ry - 1;
-                int worldZ = centerZ + direction.rightZ * (rx - 4) + direction.forwardZ * (rz - 4);
+                // Rotate custom templates 180 degrees to match built-in platform orientation.
+                int worldX = centerX + direction.rightX * (3 - rx) + direction.forwardX * (3 - rz);
+                int worldY = centerY + ry;
+                int worldZ = centerZ + direction.rightZ * (3 - rx) + direction.forwardZ * (3 - rz);
 
                 Block block = world.getBlockAt(worldX, worldY, worldZ);
-                block.setType(material, false);
+                String serializedData = entry.getBlockData();
+                if (serializedData != null && !serializedData.isBlank()) {
+                    try {
+                        BlockData blockData = Bukkit.createBlockData(serializedData);
+                        rotateBlockDataCw(blockData, rotateDelta);
+                        block.setBlockData(blockData, false);
+                    } catch (IllegalArgumentException ex) {
+                        plugin.getLogger().warning("Failed to parse custom block data '" + serializedData + "': " + ex.getMessage());
+                        block.setType(material, false);
+                    }
+                } else {
+                    block.setType(material, false);
+                }
+                if (material == Material.BRICK_WALL || material.name().endsWith("_WALL") || material.name().endsWith("_FENCE")) {
+                    railingBlocks.add(new BlockPoint(worldX, worldY, worldZ));
+                }
                 protectedBlocks.add(new BlockPoint(worldX, worldY, worldZ));
             }
         }
 
-        // Add default spawn point and NPC
-        addDefaultStructure(world, center);
+        // Spawn and NPC marker blocks are standardized for all platforms.
+        world.getBlockAt(relativeLocation(world, centerX, centerY, centerZ, direction, 3, 3)).setType(materials.spawn(), false);
+        world.getBlockAt(relativeLocation(world, centerX, centerY, centerZ, direction, 3, 2)).setType(materials.npc(), false);
 
-        // Create NPC at standard position
-        Location npcLocation = new Location(world, centerX + direction.rightX * 3 + 0.5, centerY + 2.0, centerZ + direction.forwardZ * 3 + 0.5);
+        fixWallConnections(world, railingBlocks);
+
+        // Create NPC at same position logic as built-in platforms.
+        Location npcLocation = relativeLocation(world, centerX, centerY + 1, centerZ, direction, 3, 2).add(0.5, 0.0, 0.5);
         Location openingCenter = relativeLocation(world, centerX, centerY + 1, centerZ, direction, 3, 6).add(0.5, 0.0, 0.5);
         npcLocation.setDirection(openingCenter.toVector().subtract(npcLocation.toVector()));
         Villager villager = (Villager) world.spawnEntity(npcLocation, EntityType.VILLAGER);
@@ -584,19 +721,32 @@ public final class PlatformManager {
             Block b = world.getBlockAt(block.getX(), block.getY(), block.getZ());
             BlockData data = b.getBlockData();
             if (data instanceof Wall wall) {
-                wall.setHeight(BlockFace.NORTH, Height.LOW);
-                wall.setHeight(BlockFace.SOUTH, Height.LOW);
-                wall.setHeight(BlockFace.EAST, Height.LOW);
-                wall.setHeight(BlockFace.WEST, Height.LOW);
+                wall.setHeight(BlockFace.NORTH, isConnectableSide(world, block, BlockFace.NORTH) ? Height.LOW : Height.NONE);
+                wall.setHeight(BlockFace.SOUTH, isConnectableSide(world, block, BlockFace.SOUTH) ? Height.LOW : Height.NONE);
+                wall.setHeight(BlockFace.EAST, isConnectableSide(world, block, BlockFace.EAST) ? Height.LOW : Height.NONE);
+                wall.setHeight(BlockFace.WEST, isConnectableSide(world, block, BlockFace.WEST) ? Height.LOW : Height.NONE);
                 b.setBlockData(wall, false);
-            } else if (data instanceof org.bukkit.block.data.type.Fence fence) {
-                fence.setFace(BlockFace.NORTH, true);
-                fence.setFace(BlockFace.SOUTH, true);
-                fence.setFace(BlockFace.EAST, true);
-                fence.setFace(BlockFace.WEST, true);
+            } else if (data instanceof Fence fence) {
+                fence.setFace(BlockFace.NORTH, isConnectableSide(world, block, BlockFace.NORTH));
+                fence.setFace(BlockFace.SOUTH, isConnectableSide(world, block, BlockFace.SOUTH));
+                fence.setFace(BlockFace.EAST, isConnectableSide(world, block, BlockFace.EAST));
+                fence.setFace(BlockFace.WEST, isConnectableSide(world, block, BlockFace.WEST));
                 b.setBlockData(fence, false);
             }
         }
+    }
+
+    private boolean isConnectableSide(World world, BlockPoint origin, BlockFace face) {
+        Block neighbor = world.getBlockAt(origin.getX() + face.getModX(), origin.getY(), origin.getZ() + face.getModZ());
+        Material material = neighbor.getType();
+        if (material.isAir()) {
+            return false;
+        }
+        if (material.isSolid()) {
+            return true;
+        }
+        String name = material.name();
+        return name.endsWith("_FENCE") || name.endsWith("_WALL") || name.endsWith("_FENCE_GATE");
     }
 
     private void placeLight(World world, int centerX, int y, int centerZ, DirectionPair direction, int r, int f) {
