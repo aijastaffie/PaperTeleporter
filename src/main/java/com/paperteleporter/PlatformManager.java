@@ -304,7 +304,7 @@ public final class PlatformManager {
                 int x = centerX + direction.rightX * (r - 3) + direction.forwardX * (f - 3);
                 int z = centerZ + direction.rightZ * (r - 3) + direction.forwardZ * (f - 3);
 
-                for (int y = centerY; y <= centerY + 5; y++) {
+                for (int y = centerY; y <= centerY + 6; y++) {
                     world.getBlockAt(x, y, z).setType(Material.AIR, false);
                     protectedBlocks.add(new BlockPoint(x, y, z));
                 }
@@ -398,10 +398,11 @@ public final class PlatformManager {
             }
         }
 
-        placeLight(world, centerX, centerY + 2, centerZ, direction, 0, 0);
-        placeLight(world, centerX, centerY + 2, centerZ, direction, 6, 0);
-        placeLight(world, centerX, centerY + 2, centerZ, direction, 0, 6);
-        placeLight(world, centerX, centerY + 2, centerZ, direction, 6, 6);
+        int lightY = (preset == Preset.OPEN) ? centerY + 1 : centerY + 6;
+        placeLight(world, centerX, lightY, centerZ, direction, 0, 0);
+        placeLight(world, centerX, lightY, centerZ, direction, 6, 0);
+        placeLight(world, centerX, lightY, centerZ, direction, 0, 6);
+        placeLight(world, centerX, lightY, centerZ, direction, 6, 6);
 
         fixWallConnections(world, railingBlocks);
 
