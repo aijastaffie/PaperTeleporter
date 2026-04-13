@@ -110,7 +110,7 @@ public final class PlatformManager {
         DirectionPair direction = DirectionPair.fromYaw(player.getLocation().getYaw()).rotate180();
 
         int baseX = anchorLocation.getBlockX();
-        int baseY = anchorLocation.getBlockY();
+        int baseY = anchorLocation.getBlockY() + 1;
         int baseZ = anchorLocation.getBlockZ();
 
         int centerX = baseX + (direction.rightX * 3) + (direction.forwardX * 3);
