@@ -2,6 +2,15 @@
 
 PaperMC plugin for building protected 7x7 teleport platforms that form a teleport network through NPC interaction.
 
+## Download
+
+- You can download the pre-built `.jar` file from this repository's **Releases** section.
+
+## Feedback and Bug Reports
+
+- Feedback is welcome.
+- If you find an issue, please open a bug report in this repository.
+
 ## Tech Stack
 
 - Java 25
